@@ -1,5 +1,3 @@
-#Include peep.ahk
-
 ;===================================================================================================
 ; Multi_Clipboard
 ; GroggyOtter - 20230502
@@ -196,10 +194,6 @@ class multi_clipboard {                                                         
         static WM_NCLBUTTONDOWN := 0xA1                                                             ; Message for left clicking on a window's titlebar
         if (wparam = 1)                                                                             ; If Left Mouse is down
             PostMessage(WM_NCLBUTTONDOWN, 2,,, "ahk_id " hwnd)                                      ; Tell windows left click is down on the title bar
-    }
-    
-    static copy_to_clipboard() {
-        
     }
     
     static destroy_gui() {                                                                          ; Destroys current gui
