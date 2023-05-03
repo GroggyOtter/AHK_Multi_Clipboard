@@ -30,7 +30,7 @@ class multi_clipboard {                                                         
     #Requires AutoHotkey 2.0+                                                                       ; Always define ahk version
     
     ; User settings
-    static input_mode   := 2                                                                        ; Set numberset to use: 0 = 0-9, 1 = Numpad0-Numpad9, 2 = F1-F12
+    static input_mode   := 1                                                                        ; Set numberset to use: 0 = 0-9, 1 = Numpad0-Numpad9, 2 = F1-F12
     static quick_view   := 0                                                                        ; Set to true to close clipview on key release
     
     static copy_hotkey  := '^'                                                                      ; Modifier key to make a key copy
@@ -44,6 +44,8 @@ class multi_clipboard {                                                         
     static __New() {                                                                                ; Run at script startup
         this.clip_dat := Map()                                                                      ; Create clip_dat map to store all clipboard data
         this.gui := 0                                                                               ; Initialize gui
+        this.input_mode := this.set_input_mode()
+        
         this.mod_map := Map('copy' ,this.copy_hotkey                                                ; Make map for hotkey creation
                         ,'paste',this.paste_hotkey
                         ,'show' ,this.show_hotkey)
@@ -56,8 +58,17 @@ class multi_clipboard {                                                         
         loop times {                                                                                ; Loop once for each key number
             num := A_Index - (this.input_mode = 2 ? 0 : 1)                                          ; Minus 1 for non function keys so they start at 0
             ,prfx := !this.input_mode ? '' : (this.input_mode = 1) ? 'Numpad' : 'F'                 ; Set prefix > 0 = none, 1 = NumPad, 2 = F
+            ,this.clip_dat[num] := {str:'',bin:Buffer(0)}                                           ; Initialize with an object for string and binary
             ,this.make_hotkey(num, prfx)                                                            ; Create hotkey
         }
+    }
+    
+    static set_input_mode() {
+        im := this.input_mode
+        return IsNumber(im) ? this.input_mode
+            : InStr(im, 'f') ? 2
+            : InStr(im, 'p') ? 1
+            : 0
     }
     
     static make_hotkey(num, prfx) {
@@ -67,7 +78,6 @@ class multi_clipboard {                                                         
         for method, hk_mod in this.mod_map {                                                        ; Loop through copy/paste/show methods and mods
             obm := ObjBindMethod(this, method, num)                                                 ; Make BoundFunc to run when copy/paste/show pressed
             ,Hotkey('*' hk_mod prfx num, obm)                                                       ; Creates copy/paste/show in both numpad and shift+numpad variants
-            ,this.clip_dat[num] := ''                                                               ; Initialize all clipboard slots as empty strings
             ,(this.input_mode = 1) ? Hotkey('*' hk_mod prfx num_shift[num], obm) : 0                ; If numpad, make a shift variant hotkey
         }
     }
@@ -77,13 +87,14 @@ class multi_clipboard {                                                         
         ,A_Clipboard := ''                                                                          ; Clear clipboard
         ,SendInput('^c')                                                                            ; Send copy
         ,ClipWait(1, 1)                                                                             ; Wait up to 1 sec for clipboard to contain something
-        ,this.clip_dat[index] := this.is_str(A_Clipboard) ? A_Clipboard : ClipboardAll()            ; Save string/bin data to clip_dat
+        ,this.clip_dat[index].bin := ClipboardAll()                                                 ; Save string/bin data to clip_dat
+        ,this.clip_dat[index].str := A_Clipboard                                                    ; Save string/bin data to clip_dat
         ,A_Clipboard := bak                                                                         ; Finally, restore the original clipboard contents
     }
     
     static paste(index, *) {                                                                        ; Method to call when pasting saved data
         bak := ClipboardAll()                                                                       ; Backup current clipboard contents
-        ,A_Clipboard := this.clip_dat[index]                                                        ; Put saved data back onto clipboard
+        ,A_Clipboard := this.clip_dat[index].bin                                                    ; Put saved data back onto clipboard
         ,SendInput('^v')                                                                            ; Paste
         loop 10                                                                                     ; Wait up to 1 second for clipboard to not be in use
             Sleep(100)
@@ -93,21 +104,13 @@ class multi_clipboard {                                                         
     
     static show(index:='', hk:='', *) {                                                             ; Method to show contents of clip_dat
         str := ''                                                                                   ; String to display
-        
-        switch this.input_mode {                                                                    ; Get key type using input_mode
-            case 0: typ := 'Number '
-            case 1: typ := 'Numpad'
-            case 2: typ := 'F'
-        }
-        
         if (index != '')                                                                            ; If key not blank, clipboard was specified
-            str .= this.format_line(index, typ)                                                     ; Get that key's clipboard info
+            str .= this.format_line(index)                                                          ; Get that key's clipboard info
         else                                                                                        ; Else if key was blank, get all clipboards
-            for index, dat in this.clip_dat                                                         ; Loop through clip_dat
-                str .= this.format_line(index, typ) '`n`n'                                          ; Format each clipboard
+            for index in this.clip_dat                                                              ; Loop through clip_dat
+                str .= this.format_line(index) '`n`n'                                               ; Format each clipboard
         
-        title := []
-        this.make_gui(RTrim(str, '`n'), title)                                                      ; Trim text and make a gui to display it
+        this.make_gui(RTrim(str, '`n'))                                                             ; Trim text and make a gui to display it
         
         If this.quick_view                                                                          ; If quick view is enabled
             KeyWait(this.strip_mods(hk))                                                            ; Halt code here until hotkey is released
@@ -115,35 +118,52 @@ class multi_clipboard {                                                         
         return
     }
     
-    static format_line(index, typ) {                                                                ; Formats clipboard text for display
+    static format_line(index) {                                                                     ; Formats clipboard text for display
+        switch this.input_mode {                                                                    ; Get key type using input_mode
+            case 0: typ := 'Number '
+            case 1: typ := 'Numpad'
+            case 2: typ := 'F'
+        }
         dat := this.clip_dat[index]                                                                 ; Get clipboard data
-        ,header := '[' typ  index '] ========================================`n`n'                  ; Format header
-        ,str := (dat = '') ? txt := '<EMPTY>'                                                       ; Mark empty clipboard slot
-            : this.is_str(dat) ? dat                                                                ; Else if string, show data
-            : '<BINARY_DATA>`n  Size: ' dat.Size '`n  Pointer: ' dat.Ptr                            ; Else show size and pointer of binary data
-        return header str
+        switch {
+            case (dat.bin.Size = 0) : body := '<EMPTY>'                                             ; If var is empty, mark it
+            case StrLen(dat.str)    : body := dat.str                                               ; If data is string, send it
+            default:                  body := '<BINARY DATA>`n  Pointer: ' dat.bin.Ptr              ; Else get binary data info
+                                           .  '`n  Size: ' dat.bin.Size
+        }
+        bar := '================================================================================'   ; Separator
+        str := ';=[' typ  index ']' bar '`n`n'                                                      ; Make text a little more sexy
+        return str body
     }
     
-    static make_gui(str, title) {                                                                   ; Create a gui to display text
+    static make_gui(str) {                                                                          ; Create a gui to display text
         if this.HasOwnProp('gui')                                                                   ; Check if a gui already exists
             this.destroy_gui()                                                                      ; If yes, get rid of it
         
         ; Set default values
         m := 10                                                                                     ; Choose default margin size
-        ,edt := {h:A_ScreenHeight*0.7, w:A_ScreenWidth*0.3}                                         ; Make popup 40%/70% for screen width/height
-        ,btn := {w:edt.w, h:30}                                                                     ; Set btn width to edit box width and 30 px high
+        edt := {h:A_ScreenHeight*0.7, w:A_ScreenWidth*0.3}                                          ; Make popup 40%/70% for screen width/height
+        btn := {w:(edt.w - m) / 2, h:30}                                                            ; Set btn width to edit box width and 30 px high
+        title := this.input_mode_str ' Keys - ' A_ScriptName                                        ; Set the title to show
+        bg_col := '101010'
         ; Make GUI
         goo := Gui()                                                                                ; Make main gui object
-        ,goo.title := this.input_mode_str ' Keys - ' A_ScriptName                                   ; Set the title to show
+        ,goo.title := title
         ,goo.MarginX := goo.MarginY := m                                                            ; Set default margins > Useful for spacing
-        ,goo.BackColor := 0x101010                                                                  ; Make main gui dark
+        ,goo.BackColor := bg_col                                                                    ; Make main gui dark
         ,goo.OnEvent('Close', (*) => goo.Destroy())                                                 ; On gui close, destroy it
         ,goo.OnEvent('Escape', (*) => goo.Destroy())                                                ; On escape press, destroy it
         ,goo.SetFont('s10', 'Consolas')                                                             ; Default font values
         ; Edit box
-        opt := ' ReadOnly -Wrap +0x300000 -WantReturn -WantTab'                                     ; Edit control options
-        ,goo.AddEdit('xm ym w' edt.w ' h' edt.h opt, str)                                           ; Add edit control to gui
-        ,goo.close := goo.AddButton('xm y+' m ' w' btn.w ' h' btn.h, 'Close')                       ; Add an large close button
+        opt := ' ReadOnly -Wrap +0x300000 -WantReturn -WantTab Background' bg_col                   ; Edit control options
+        ,goo.edit := goo.AddEdit('xm ym w' edt.w ' h' edt.h opt, str)                               ; Add edit control to gui
+        ,goo.edit.SetFont('cWhite')
+        ; Copy btn
+        goo.copy := goo.AddButton('xm y+' m ' w' btn.w ' h' btn.h, 'Copy To Clipboard')             ; Add an large close button
+        ,goo.copy.OnEvent('Click', (*) => A_Clipboard := goo.edit.value)                            ; When it's clicked, destroy gui
+        ,goo.copy.Focus()                                                                           ; Now close button the focused control
+        ; Close btn
+        goo.close := goo.AddButton('x+' m ' yp w' btn.w ' h' btn.h, 'Close')                         ; Add an large close button
         ,goo.close.OnEvent('Click', (*) => goo.Destroy())                                           ; When it's clicked, destroy gui
         ,goo.close.Focus()                                                                          ; Now close button the focused control
         ; Finish up
@@ -161,6 +181,10 @@ class multi_clipboard {                                                         
             PostMessage(WM_NCLBUTTONDOWN, 2,,, "ahk_id " hwnd)                                      ; Tell windows left click is down on the title bar
     }
     
+    static copy_to_clipboard() {
+        
+    }
+    
     static destroy_gui() {                                                                          ; Destroys current gui
         try this.gui.destroy()                                                                      ; Try suppresses errors if gui doesn't exist
     }
@@ -173,14 +197,10 @@ class multi_clipboard {                                                         
     }
     
     static verify_mod_map() {                                                                       ; Warns user of duplicate key assignments
-        for meth1, mod1 in this.mod_map
-            for meth2, mod2 in this.mod_map
-                if StrCompare(mod1, mod2) && !StrCompare(meth1, meth2)
-                    throw Error('Duplicate modifiers found in mod_map', A_ThisFunc
+        for meth1, mod1 in this.mod_map                                                             ; Loop through mod_map once for base
+            for meth2, mod2 in this.mod_map                                                         ; Loop again for comparison
+                if StrCompare(mod1, mod2) && !StrCompare(meth1, meth2)                              ; If two modifiers match but keys don't
+                    throw Error('Duplicate modifiers found in mod_map', A_ThisFunc                  ; Throw an error to notify user
                             ,'`n' meth1 ':' mod1 '`n' meth2 ':' mod2)
-    }
-    
-    static is_str(value) {                                                                          ; Function to determine if data can be stored as a string
-        return !IsSet(value) ? 0 : InStr('String,Number', Type(value))                              ; If value type is string or number, return true
     }
 }
