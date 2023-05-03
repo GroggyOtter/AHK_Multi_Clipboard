@@ -1,3 +1,5 @@
+#Include peep.ahk
+
 ;===================================================================================================
 ; Multi_Clipboard
 ; GroggyOtter - 20230502
@@ -6,26 +8,27 @@
 ; Allows number bar, numpad, or function keys to be used.
 ; Modifier keys are used to either copy, paste, or view a key's clipboard
 ; 
-; === Usage ===
+; === Usage ========================================================================================
 ; Treats a numberset as multiple virtual clipboard that you can copy to, paste from, and display
 ;   Example:input_mode is 1, copy_hotkey is ^, paste_hotkey is <!, show_hotkey is #
 ;     Control+Numpad5 saves to clipboard 5
 ;     LeftALt+Numpad5 pastes whatever is on clipboard 5 (But RightAlt does not work)
 ;     Win+Numpad5 displays a gui showing the conents, if any, saved to clipboard 5
 ; 
-; === Properties ===
+; === Properties ===================================================================================
 ; input_mode      = Determines if numpad, the number bar, or function keys are used
 ;     numbar  | 0 = Top row 0-9 are used
 ;     numpad  | 1 = Numpad0 - Numpad9 are used
 ;     func    | 2 = F1-F12 are used
 ; quick_view      = If true, key down shows pop GUI and closes on key release
 ;
-; === Hotkey Properties ===
+; === Hotkey Properties ============================================================================
 ; copy_hotkey     = Modifier that assigns copying to a key
 ; paste_hotkey    = Modifier that assigns pasting from a key
 ; show_hotkey     = Modifier that shows current contents of a key
 ; all_hotkey      = Hotkey that shows contents of all clipboards
 ;                 = Modifier keys: Alt !  Shift +  Ctrl ^  Windows #  LeftSideMod <  RightSideMod >
+;===================================================================================================
 class multi_clipboard {                                                                             ; Make a class to bundle our properties (variables) and methods (functions)
     #Requires AutoHotkey 2.0+                                                                       ; Always define ahk version
     
@@ -63,12 +66,12 @@ class multi_clipboard {                                                         
         }
     }
     
-    static set_input_mode() {
-        im := this.input_mode
-        return IsNumber(im) ? this.input_mode
-            : InStr(im, 'f') ? 2
-            : InStr(im, 'p') ? 1
-            : 0
+    static set_input_mode() {                                                                       ; Converts text input_mode to number
+        im := this.input_mode                                                                       ; Shorten b/c don't wanna type this.input_mode repeatedly
+        return IsNumber(im) ? this.input_mode                                                       ; If number, all good
+            : InStr(im, 'f') ? 2                                                                    ; only function has an f
+            : InStr(im, 'p') ? 1                                                                    ; only numpad has a p
+            : 0                                                                                     ; else default to number bar
     }
     
     static make_hotkey(num, prfx) {
@@ -110,6 +113,10 @@ class multi_clipboard {                                                         
             for index in this.clip_dat                                                              ; Loop through clip_dat
                 str .= this.format_line(index) '`n`n'                                               ; Format each clipboard
         
+        edit_max_char := 64000
+        if (StrLen(str) > edit_max_char)
+            str := SubStr(str, 1, edit_max_char)
+        
         this.make_gui(RTrim(str, '`n'))                                                             ; Trim text and make a gui to display it
         
         If this.quick_view                                                                          ; If quick view is enabled
@@ -127,9 +134,9 @@ class multi_clipboard {                                                         
         dat := this.clip_dat[index]                                                                 ; Get clipboard data
         switch {
             case (dat.bin.Size = 0) : body := '<EMPTY>'                                             ; If var is empty, mark it
-            case StrLen(dat.str)    : body := dat.str                                               ; If data is string, send it
+            case StrLen(dat.str)    : body := dat.str                                               ; If data contains text, use it
             default:                  body := '<BINARY DATA>`n  Pointer: ' dat.bin.Ptr              ; Else get binary data info
-                                           .  '`n  Size: ' dat.bin.Size
+                                        .  '`n  Size: ' dat.bin.Size
         }
         bar := '================================================================================'   ; Separator
         str := ';=[' typ  index ']' bar '`n`n'                                                      ; Make text a little more sexy
@@ -142,22 +149,32 @@ class multi_clipboard {                                                         
         
         ; Set default values
         m := 10                                                                                     ; Choose default margin size
-        edt := {h:A_ScreenHeight*0.7, w:A_ScreenWidth*0.3}                                          ; Make popup 40%/70% for screen width/height
-        btn := {w:(edt.w - m) / 2, h:30}                                                            ; Set btn width to edit box width and 30 px high
-        title := this.input_mode_str ' Keys - ' A_ScriptName                                        ; Set the title to show
-        bg_col := '101010'
+        ,chr_w := 8                                                                                 ; Set a char width
+        ,chr_h := 15                                                                                ; Set a char height
+        ,strl := 0                                                                                  ; Track max str length
+        loop parse str, '`n', '`r'                                                                  ; Go through each line of the string
+            n := StrLen(A_LoopField), (n > strl ? strl := n : 0), strr := A_Index                   ; If length of str > strl, record new max
+        
+        w := (strl) * chr_w                                                                         ; Width = chars wide * char width
+        ,h := (strr + 2) * chr_h                                                                    ; Height = Rows (+4 scrollbar/padding) * char height
+        ,(h > A_ScreenHeight*0.7) ? h := A_ScreenHeight*0.7 : 0                                     ; Don't let height exceed 70% screen height
+        ,(w > A_ScreenWidth*0.8) ? w := A_ScreenWidth*0.8 : 0                                       ; Don't let width exceed 80% screen width
+        ,edt := {h:h, w:w}                                                                          ; Set edit box dimensions
+        ,btn := {w:(edt.w - m) / 2, h:30}                                                           ; Set btn width to edit box width and 30 px high
+        ,title := this.input_mode_str ' Keys - ' A_ScriptName                                       ; Set the title to show
+        ,bg_col := '101010'                                                                         ; Background color (very dark gray)
+        
         ; Make GUI
         goo := Gui()                                                                                ; Make main gui object
-        ,goo.title := title
+        ,goo.title := title                                                                         ; Set window title
         ,goo.MarginX := goo.MarginY := m                                                            ; Set default margins > Useful for spacing
         ,goo.BackColor := bg_col                                                                    ; Make main gui dark
         ,goo.OnEvent('Close', (*) => goo.Destroy())                                                 ; On gui close, destroy it
         ,goo.OnEvent('Escape', (*) => goo.Destroy())                                                ; On escape press, destroy it
-        ,goo.SetFont('s10', 'Consolas')                                                             ; Default font values
+        ,goo.SetFont('s10 cWhite Bold', 'Consolas')                                               ; Default font size, color, weight, and type
         ; Edit box
         opt := ' ReadOnly -Wrap +0x300000 -WantReturn -WantTab Background' bg_col                   ; Edit control options
         ,goo.edit := goo.AddEdit('xm ym w' edt.w ' h' edt.h opt, str)                               ; Add edit control to gui
-        ,goo.edit.SetFont('cWhite')
         ; Copy btn
         goo.copy := goo.AddButton('xm y+' m ' w' btn.w ' h' btn.h, 'Copy To Clipboard')             ; Add an large close button
         ,goo.copy.OnEvent('Click', (*) => A_Clipboard := goo.edit.value)                            ; When it's clicked, destroy gui
