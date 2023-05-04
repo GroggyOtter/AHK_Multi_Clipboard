@@ -4,77 +4,92 @@
 ; Creation Date: 20230501
 ;===================================================================================================
 ; A Customizable multi-clipboard script.
-; Allows number bar, numpad, or function keys to be used.
-; Modifier keys are used to either copy, paste, or view a key's clipboard
+; Allows number bar, numpad, and/or function keys to be used.
+; Modifier keys are used to copy, paste, or view a key's clipboard
 ; 
 ; === Usage ========================================================================================
-; Treats a numberset as multiple virtual clipboards that you can copy to, paste from, and display
-;   Example:input_mode is 1, copy_hotkey is ^, paste_hotkey is <!, show_hotkey is #
-;     Control+Numpad5 saves to clipboard 5
-;     LeftALt+Numpad5 pastes whatever is on clipboard 5 (But RightAlt does not work)
-;     Win+Numpad5 displays a gui showing the contents, if any, saved to clipboard 5
+; Treats a any of the keyboards number sets (numpad, function keys, number row) as multiple 
+; virtual clipboards that you can copy to, paste from, and even display their saved contents.
+; All keys can be used
+; 
+; Example: Enabling numpad, using ctrl for copy, alt for paste, and win for show:
+;    All Numpad number keys act as individual clipboard slots
+;    Pressing Ctrl+Numpad# will copy whatever has focus to a slot with that hotkey as a key
+;    Pressing Alt+Numpad# will paste the contents
+;    ANd Win+Numpad# will show the contents of that save in a GUI popup
 ; 
 ; === Properties ===================================================================================
-; input_mode      = Determines if numpad, the number bar, or function keys are used
-;     numbar  | 0 = Top row 0-9 are used
-;     numpad  | 1 = Numpad0 - Numpad9 are used
-;     func    | 2 = F1-F12 are used
-; quick_view      = If true, key down shows pop GUI and closes on key release
+; use_numpad [bool]  = true  -> numpad keys are used as extra clipboards
+; use_bar [bool]     = true  -> number bar keys are used as extra clipboards
+; use_f [bool]       = true  -> Function keys are used as extra clipboards
 ;
 ; === Hotkey Properties ============================================================================
-; copy_hotkey     = Modifier that assigns copying to a key
-; paste_hotkey    = Modifier that assigns pasting from a key
-; show_hotkey     = Modifier that shows current contents of a key
-; all_hotkey      = Hotkey that shows contents of all clipboards
-;                 = Modifier keys: Alt !  Shift +  Ctrl ^  Windows #  LeftSideMod <  RightSideMod >
+; all_hotkey [str]   = A Hotkey to show contents of all clipboards
+; copy_hotkey [str]  = Modifier that copies to a key
+; paste_hotkey [str] = Modifier that pastes from a key
+; show_hotkey [str]  = Modifier shows contents of a key. Valid modifiers:
+;                    = ! Alt   ^ Ctrl   + Shift   # Windows   < LeftSideMod   > RightSideMod
+;
+; === Optional Properties ==========================================================================
+; quick_view [bool]  = true  -> key down shows pop GUI and closes on key release
+;                    = false -> Key press pops up GUI and it stays up until closed
+; hide_empty [bool]  = true  -> Empty clipboards are omitted from display when shown
+;                    = false -> Empty clipboards show with key headers and as <EMPTY>
+; hide_binary [bool] = true  -> Binary data clipboards are omitted from display when shown
+;                    = false -> Binary data clipboards show with key headers and as <BINARY_DATA>
+; disable_list [arr] = An array of strings containing WinTitles
+;                    = Multi_Clipboard will be disabled in any of the provided WinTitles
+;                    = WinTitle Docs: https://www.autohotkey.com/docs/v2/misc/WinTitle.htm
+;
 ;===================================================================================================
 class multi_clipboard {                                                                             ; Make a class to bundle our properties (variables) and methods (functions)
     #Requires AutoHotkey 2.0+                                                                       ; Always define ahk version
     static version      := '1.0'                                                                    ; Helps to track versions and what changes have been made
     
     ; User settings
-    static input_mode   := 1                                                                        ; Set numberset to use: 0 = 0-9, 1 = Numpad0-Numpad9, 2 = F1-F12
-    static quick_view   := 0                                                                        ; Set to true to close GUI on key release
+    static use_pad      := 1                                                                        ; Enable/disable numpad keys
+    static use_bar      := 1                                                                        ; Enable/disable number bar keys
+    static use_f        := 1                                                                        ; Enable/disable function keys
     
     static copy_hotkey  := '^'                                                                      ; Modifier key to make a key copy
     static paste_hotkey := '!'                                                                      ; Modifier key to make a key paste
     static show_hotkey  := '#'                                                                      ; Modifier key to show key contents
     static all_hotkey   := '^NumpadEnter'                                                           ; Hotkey to show all keys
     
-    static input_mode_str => !this.input_mode ? 'Function' 
-                        : this.input_mode = 1 ? 'Numpad'
-                        : 'Number Bar'
+    static quick_view   := 0                                                                        ; Set to true to close GUI on key release
+    static hide_empty   := 1                                                                        ; Set to true to omit empty clipboards from being shown
+    static hide_binary  := 1                                                                        ; Set to true to omit clipboards with binary data from being shown
+    static disable_list := ['ahk_exe MakeBelieveProgramName.exe'                                    ; Array of WinTitles where Multi_Clipboard will be disabled
+                        ,'PutTitleHere ahk_exe PutExeNameHere.exe ahk_class AndClassNameHere']   ; Full WinTitle example for user
+    
     static __New() {                                                                                ; Run at script startup
-        this.clip_dat := Map()                                                                      ; Create clip_dat map to store all clipboard data
-        ,this.gui := 0                                                                              ; Initialize gui
-        ,this.input_mode := this.set_input_mode()                                                   ; Converts str modes to num
-        
+        this.make_disable_group()
+        ,obm := ObjBindMethod(this, 'show', '')                                                     ; Create a show all boundfunc to fire on keypress
+        ,HotIfWinNotactive('ahk_group ' this.group_name)                                            ; Set HotIf to disable hotkey in specified programs
+        ,Hotkey('*' this.all_hotkey, obm)                                                           ; Create show all hotkey using obm
+        ,this.clip_dat := Map()                                                                     ; Create main clip_dat map to store clipboard data
+        ,this.gui := 0                                                                              ; Initialize gui property
         ,this.mod_map := Map('copy' ,this.copy_hotkey                                               ; Make map for hotkey creation
                             ,'paste',this.paste_hotkey
                             ,'show' ,this.show_hotkey)
         ,this.verify_mod_map()                                                                      ; Warn user of any duplicate maps
-        ,obm := ObjBindMethod(this, 'show', '')                                                     ; Create a show all boundfunc to fire on keypress
-        ,Hotkey('*' this.all_hotkey, obm)                                                           ; Create hotkey with obm
-        
-        this.backup()                                                                               ; Backup clipboard to original contents
+        ,this.backup()                                                                              ; Backup clipboard to original contents
         ,empty := ClipboardAll()                                                                    ; Save empty ClipboardAll object for clip_dat initialization
-        ,times := this.input_mode = 2 ? 12 : 10                                                     ; Set loop to 12 if function and 10 for numpad/numbar
-        loop times {                                                                                ; Loop once for each number in the set
-            num := A_Index - (this.input_mode = 2 ? 0 : 1)                                          ;  Use index for minus 1 for non-function keys so they start at 0
-            ,prfx := !this.input_mode ? '' : (this.input_mode = 1) ? 'Numpad' : 'F'                 ;  Set prefix > 0 = none, 1 = NumPad, 2 = F
-            ,this.clip_dat[num] := {str:'', bin:empty}                                              ;  Initialize with an object for string and binary
-            ,this.make_hotkey(num, prfx)                                                            ;  Create hotkey
         
-        this.restore()                                                                              ; Restore clipboard to original contents
+        for _, key in ['bar', 'pad', 'f'] {                                                         ; Loop through each type of key set
+            if (!this.use_%key%)                                                                    ;  If that set is false
+                continue                                                                            ;  Continue to next set
+            
+            times := (key = 'f') ? 12 : 10                                                          ;  Get number of keys in set
+            ,prfx := (key = 'f') ? 'F' : (key = 'pad') ? 'Numpad' : ''                              ;  Get numset prefix
+            
+            loop times                                                                              ;  Loop once for each number in the set
+                num  := (key = 'f') ? A_Index : A_Index - 1                                         ;   -1 to start at 0 except FuncKeys that start at 1
+                ,this.clip_dat[prfx num] := {str:'', bin:empty}                                     ;   Initialize with an object for string and raw binary
+                ,this.make_hotkey(num, prfx)                                                        ;   Create hotkey
         }
-    }
-    
-    static set_input_mode() {                                                                       ; Converts text input_mode to number
-        im := this.input_mode                                                                       ; Shorten b/c don't wanna type this.input_mode repeatedly
-        return IsNumber(im) ? this.input_mode                                                       ; If number, all good
-            : InStr(im, 'f') ? 2                                                                    ; only function has an f
-            : InStr(im, 'p') ? 1                                                                    ; only numpad has a p
-            : 0                                                                                     ; else default to number bar
+        HotIf()                                                                                     ; ALWAYS reset HotIf() after you've used it
+        this.restore()                                                                              ; Restore clipboard to original contents
     }
     
     static make_hotkey(num, prfx) {
@@ -82,18 +97,24 @@ class multi_clipboard {                                                         
                         ,5,'Clear'  ,6,'Right'  ,7,'Home'  ,8,'Up'    ,9,'PgUp')
         
         for method, hk_mod in this.mod_map {                                                        ; Loop through copy/paste/show methods and mods
-            obm := ObjBindMethod(this, method, num)                                                 ;  Make BoundFunc to run when copy/paste/show pressed
+            obm := ObjBindMethod(this, method, prfx num)                                            ;  Make BoundFunc to run when copy/paste/show pressed
             ,Hotkey('*' hk_mod prfx num, obm)                                                       ;  Creates copy/paste/show in both numpad and shift+numpad variants
-            ,(this.input_mode = 1) ? Hotkey('*' hk_mod prfx num_shift[num], obm) : 0                ;  If numpad, make a shift variant hotkey
+            ,(prfx = 'numpad') ? Hotkey('*' hk_mod prfx num_shift[num], obm) : 0                    ;  If numpad, make a shift variant hotkey
         }
+    }
+    
+    static make_disable_group() {
+        this.group_name := 'MULTI_CLIPBOARD_DISABLE_LIST'
+        for _, id in this.disable_list
+            GroupAdd(this.group_name, id)
     }
     
     static copy(index, *) {                                                                         ; Method to call when copying data
         this.backup()                                                                               ; Backup current clipboard contents
         ,SendInput('^c')                                                                            ; Send copy
         ,ClipWait(1, 1)                                                                             ; Wait up to 1 sec for clipboard to contain something
-        ,this.clip_dat[index].bin := ClipboardAll()                                                 ; Save string/bin data to clip_dat
-        ,this.clip_dat[index].str := A_Clipboard                                                    ; Save string/bin data to clip_dat
+        ,this.clip_dat[index].bin := ClipboardAll()                                                 ; Save binary data to bin
+        ,this.clip_dat[index].str := A_Clipboard                                                    ; Save string to str
         ,this.restore()                                                                             ; Restore clipboard to original contents
     }
     
@@ -107,28 +128,28 @@ class multi_clipboard {                                                         
         this.restore()                                                                              ; Restore clipboard to original contents
     }
     
-    static backup() {                                                                               ; Backs up and clears clipboard
+    static backup() {                                                                               ; Backup and clear clipboard
         this._backup := ClipboardAll()
         ,A_Clipboard := ''
     }
     
-    static restore() {                                                                              ; Restores clipboard
+    static restore() {                                                                              ; Restore backup to clipboard
         A_Clipboard := this._backup
     }
     
     static show(index:='', hk:='', *) {                                                             ; Method to show contents of clip_dat
         str := ''                                                                                   ; String to display
-        if (index != '')                                                                            ; If key not blank, clipboard was specified
-            str .= this.format_line(index)                                                          ;  Get that key's clipboard info
+        if (index != '')                                                                            ; If key not blank, index was specified
+            str := this.format_line(index)                                                          ;  Get line from that index
         else                                                                                        ; Else if key was blank, get all clipboards
             for index in this.clip_dat                                                              ;  Loop through clip_dat
-                str .= this.format_line(index) '`n`n'                                               ;   Format each clipboard
+                str .= this.format_line(index)                                                      ;   Format each clipboard
         
         edit_max_char := 64000                                                                      ; Edit boxes have a max char of around 64000
-        if (StrLen(str) > edit_max_char)                                                            ; If chars exceeds that
-            str := SubStr(str, 1, edit_max_char)                                                    ;  Keep only the first 64000 chars so no error is thrown
+        if (StrLen(str) > edit_max_char)                                                            ; If chars exceed that, it will error
+            str := SubStr(str, 1, edit_max_char)                                                    ;  Keep only the first 64000 chars
         
-        this.make_gui(RTrim(str, '`n'))                                                             ; Trim text and make a gui to display it
+        this.make_gui(Trim(str, '`n'))                                                              ; Trim new lines from text and make a gui to display str
         
         If this.quick_view                                                                          ; If quick view is enabled
             KeyWait(this.strip_mods(hk))                                                            ;  Halt code here until hotkey is released
@@ -137,20 +158,23 @@ class multi_clipboard {                                                         
     }
     
     static format_line(index) {                                                                     ; Formats clipboard text for display
-        switch this.input_mode {                                                                    ; Get key input_mode string type
-            case 0: typ := 'Number '
-            case 1: typ := 'Numpad'
-            case 2: typ := 'F'
-        }
         dat := this.clip_dat[index]                                                                 ; Get clipboard data
         switch {
-            case (dat.bin.Size = 0) : body := '<EMPTY>'                                             ; If var is empty, mark it
+            case (dat.bin.Size = 0) :                                                               ; If slot is empty
+                if this.hide_empty                                                                  ; And hide empty enabled
+                    return                                                                          ; Return nothing
+                body := '<EMPTY>'                                                                   ; Otherwise assign empty tag
             case StrLen(dat.str)    : body := dat.str                                               ; If data contains text, use it
-            default:                  body := '<BINARY DATA>`n  Pointer: ' dat.bin.Ptr              ; Else get binary data info
-                                        .  '`n  Size: ' dat.bin.Size
+            default:                                                                                ; Binary data is all that it can be
+                if this.hide_binary                                                                 ; If hide binary enabled
+                    return                                                                          ; Return nothing
+                body := '<BINARY DATA>'                                                             ; Otherwise assign binary tag
+                    .  '`n  Pointer: ' dat.bin.Ptr '`n  Size: ' dat.bin.Size                       ; And ptr/size info
         }
-        bar := '================================================================================'   ; Separator
-        str := ';=[' typ  index ']' bar '`n`n'                                                      ; Make text a little more sexy
+        
+        str := '`n`n;=[' index ']'                                                                  ; Make header for clipboard data
+            . '================================================================================'
+            . '`n`n'
         return str body
     }
     
@@ -162,18 +186,21 @@ class multi_clipboard {                                                         
         m := 10                                                                                     ; Choose default margin size
         ,chr_w := 8                                                                                 ; Set a char width
         ,chr_h := 15                                                                                ; Set a char height
-        ,strl := 0                                                                                  ; Track max str length
+        ,strl := 1                                                                                  ; Track max str length
+        ,strr := 1                                                                                  ; Track total str rows
         loop parse str, '`n', '`r'                                                                  ; Go through each line of the string
             n := StrLen(A_LoopField), (n > strl ? strl := n : 0), strr := A_Index                   ;  If length of str > strl, record new max
         
         ; Approximate how big the edit box should be
         w := (strl) * chr_w                                                                         ; Width = chars wide * char width
-        ,h := (strr + 2) * chr_h                                                                    ; Height = Rows (+4 scrollbar/padding) * char height
+        ,h := (strr + 3) * chr_h                                                                    ; Height = Rows (+4 scrollbar/padding) * char height
         ,(h > A_ScreenHeight*0.7) ? h := A_ScreenHeight*0.7 : 0                                     ; Don't let height exceed 70% screen height
         ,(w > A_ScreenWidth*0.8) ? w := A_ScreenWidth*0.8 : 0                                       ; Don't let width exceed 80% screen width
+        ,(w < 500) ? w := 500 : 0                                                                   ; Maintain a minimum width
+        ,(h < 100) ? h := 100 : 0                                                                   ; Maintain a minimum height
         ,edt := {h:h, w:w}                                                                          ; Set edit box dimensions
         ,btn := {w:(edt.w - m) / 2, h:30}                                                           ; Set btn width to edit box width and 30 px high
-        ,title := this.input_mode_str ' Keys - ' A_ScriptName                                       ; Set the title to show
+        ,title := A_ScriptName                                                                      ; Set the title to show
         ,bg_col := '101010'                                                                         ; Background color (very dark gray)
         
         ; Make GUI
