@@ -12,6 +12,7 @@
  * [Optional Properties](#optional-properties)
 * [Methods](#methods)
 * [Why remake it?](#why-remake-it)
+* [Changelog](#changelog)
 
 ## What does Multi_Clipboard do?
 A script with configurable multi-clipboard support.  
@@ -22,13 +23,15 @@ You have 32 extra clipboard slots if all number sets are used.
 The keys are controlled by modifier keys that you set.  
 ![Image:Modifier keys](https://i.imgur.com/r20VK4M.png)  
 
-Defaults are: `copy_mod` is `^` ctrl, `show_mod` is `#` ctrl, and `paste_mod` is `!` alt  
+Defaults:  
+`copy_mod` = `^` ctrl  
+`show_mod` = `#` win  
+`paste_mod` = `!` alt  
+
 Example:  
-Ctrl+numpad5 would copy to slot numpad5  
+Ctrl+numpad5 copies to slot numpad5  
 Alt+numpad5 pastes whatever is stored in numpad5  
 Win+numpad5 shows the contents of numpad5 in a popup GUI  
-
-As the main README picture shows, you have the ability to view all clipboard key's contents (or individual ones).  
 
 If a clipboard slot is empty, it shows as `<EMPTY>`.  
 ![Image:Gui with empty contents](https://i.imgur.com/Ez1j8DE.png)  
@@ -39,6 +42,9 @@ If a clipboard slot has text in it, it'll show the string.
 Otherwise the clipboard slots has some binary data and shows `<BINARY DATA>`.  
 The size and pointer of the data is included.  
 ![Image:Gui with binary contents](https://i.imgur.com/sNxEuRN.png)  
+
+You can also view all clipboard key's contents [like in the main README example](https://i.imgur.com/fw1q83V.png).  
+Or [individual ones](https://i.imgur.com/HoajrZO.png).  
 
 ## Properties
 
@@ -107,27 +113,37 @@ An array of strings containing WinTitles
 Multi_Clipboard will be disabled in any of the provided WinTitles  
 WinTitle Docs: https://www.autohotkey.com/docs/v2/misc/WinTitle.htm  
 
- ***
+***
 ## METHODS  
 `toggle()`
- Toggles the enable property on/off  
- `Return` New enable state after the toggle  
+Toggles the enable property on/off  
+`Return` New enable state after the toggle  
 
 ***
 ## Why remake it?
 It initially started out as a response to a post on the AHK subreddit.  
-I revisited my old "multiple clipboard" script I wrote years ago (wow, I was really new to AHK when I wrote that!)  
-I decided to rewrite a small v2 mockup to share with the user.  [Image of this script in its infancy.](https://i.imgur.com/gZJJrrO.png)  
-However, I started getting into it and I kept modifying and adding stuff I never intended to include.  
+Rivisiting my old "multiple clipboard" script I wrote years ago was a flashback.  
+It wasn't structured well and there were flaws in it.  
 
-Not only that, but I realized I was using quite a few things from AHK's library so I decided make it a purpose to comment each line in hopes anyone reading this will be able to learn from it.  
-The code covers a LOT of different components.  
+I decided to rewrite a small v2 mockup to share with the user.  
+Originally, it wasn't very big.  
+[Image of this script in its infancy.](https://i.imgur.com/gZJJrrO.png)  
+However, I started getting into it and I kept modifying and adding stuff I never intended to include.  
+Even recently I changed it from a "numpad OR number bar OR function keys" setup to a "enable any number set you want" setup.  
+
+I also realized I was using quite a few different aspects of AHK's library.  
 Creating guis. Adding controls and events.  
 Dynamically creating hotkeys.  
 String parsing.  
 Object manipulation.  
 Nested objects.  
-Adding properties that can adjust the script on the fly/gives the user control over parts of the script.  
+Adding properties to adjust the script during operations so it can be changed by the user.  
 Class structuring and avoidance of global space coding and variables.  
 Not to mention all the different fucntions calls and object types used.  
-I just feel like it has a ton of different components to learn about.  
+
+I decided to start commenting out every line in hopes people might learn soemthing from the code if they decided to read through it.  
+Or if they look up how a certain part of the code works.
+
+***
+## Changelog
+1.0 initial upload
