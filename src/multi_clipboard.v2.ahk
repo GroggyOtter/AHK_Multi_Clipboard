@@ -1,9 +1,9 @@
 ;___________________________________________________________________________________________________  
-; Multi_Clipboard  
+; Multi_Clipboard - A Customizable multi-clipboard script for AHKv2  
 ; Created by: GroggyOtter  
 ; Creation Date: 20230501  
 ; Github Link: https://github.com/GroggyOtter/AHK_Multi_Clipboard/  
-; A Customizable multi-clipboard script. 
+; License: Unrestricted. Please keep this top section (title/namedat/github/lic) with the code
 ; ___ USAGE ________________________________________________________________________________________  
 ; Treats a any of the keyboards number sets (numpad, function keys, number row) as multiple   
 ; virtual clipboards that you can copy to, paste from, and even display their saved contents.  
