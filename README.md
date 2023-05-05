@@ -129,7 +129,7 @@ It wasn't structured well and there were flaws in it.
 
 I decided to rewrite a small v2 mockup to share with the user.  
 Originally, it wasn't very big.  
-[Image of this script in its infancy.](https://i.imgur.com/gZJJrrO.png)  
+![Image of this script in its infancy.](https://i.imgur.com/gZJJrrO.png)  
 However, I started getting into it and I kept modifying and adding stuff I never intended to include.  
 Even recently I changed it from a "numpad OR number bar OR function keys" setup to a "enable any number set you want" setup.  
 
