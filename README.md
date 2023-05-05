@@ -3,7 +3,6 @@
 ![Image:Example of Multi_Clipboard GUI](https://i.imgur.com/fw1q83V.png)
 
 ## Navigation
-***
 * [What does Multi_Clipboard do?](#what-does-multi_clipboard-do)
 * [Properties](#properties)
  * [Number Set Properties](#number-set-properties)
