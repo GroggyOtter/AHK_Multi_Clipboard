@@ -4,14 +4,14 @@
 
 ## Navigation
 ***
-* What does Multi_Clipboard do?
-* Properties
- * Number Set Properties
- * Modifier Actions Properties
- * 'Show All Clipboards' Hotkey
- * Optional Properties
-* Methods
-* Why remake it?
+* [What does Multi_Clipboard do?](#what-does-multi_clipboard-do)
+* [Properties](#properties)
+ * [Number Set Properties](number-set-properties)
+ * [Modifier Actions Properties](#modifier-actions-properties)
+ * ['Show All Clipboards' Hotkey](show-all-clipboards-hotkey)
+ * [Optional Properties](optional-properties)
+* [Methods](methods)
+* [Why remake it?](why-remake-it)
 
 ## What does Multi_Clipboard do?
 A script with configurable multi-clipboard support.  
