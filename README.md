@@ -84,40 +84,43 @@ This is the only full hotkey you define and can be any modifer+hotkey combo.
 ***
 ### Optional Properties  
 
-* `enable` [bool]  
+* `enable := 1` [bool]  
 true -> Enables all hotkeys (does not override disable_list property)  
 false -> Disables all hotkeys  
 
-* `send_hotkey` [bool]  
+* `send_hotkey := 1` [bool]  
 true  -> Native keystroke is included with the action remap  
 false -> Native keystroke is replaced by the action remap  
 
-* `quick_view` [bool]  
+* `quick_view := 1` [bool]  
 true  -> key down shows pop GUI and closes on key release  
 false -> Key press pops up GUI and it stays up until closed  
 
-* `hide_empty` [bool]  
+* `hide_empty := 1` [bool]  
 true  -> Empty clipboards are omitted from display when shown  
-false -> Empty clipboards show with key headers and as <EMPTY>  
+false -> Empty clipboards show with key headers and as `<EMPTY>`  
 
-* `hide_binary` [bool]  
+* `hide_binary := 1` [bool]  
 true  -> Binary data clipboards are omitted from display when shown  
-false -> Binary data clipboards show with key headers and as <BINARY_DATA>  
+false -> Binary data clipboards show with key headers and as `<BINARY_DATA>`  
 
-* `show_max_char` [num]  
+* `show_max_char := 1` [num]  
 Max number of characters to show from each clipboard string  
 0 disables max and uses the full string  
 
-* `disable_list` [arr]  
-An array of strings containing WinTitles  
-Multi_Clipboard will be disabled in any of the provided WinTitles  
+* `disable_list := ['MyFakeWinTitle, ahk_exe NoNo.exe']` [arr]  
+An array of strings containing identifying WinTitles of windows where the hotkeys should be disabled.  
+This prevents it from overwriting or affecting the keys of other apps, such as games or programs you have hotkeys made for already.  
 WinTitle Docs: https://www.autohotkey.com/docs/v2/misc/WinTitle.htm  
 
 ***
 ## METHODS  
-`toggle()`
-Toggles the enable property on/off  
-`Return` New enable state after the toggle  
+Currently, there is only 1 user method:
+
+* `toggle()`  
+`Return:` the current state of the `enable` property.  
+Toggles the enable property on/off.  
+Can be bound to a hotkey for quickly enabling/disabling Multi_Clipboards hotkeys.  
 
 ***
 ## Why remake it?
