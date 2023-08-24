@@ -146,6 +146,7 @@ class multi_clipboard {                                                         
         loop 20                                                                                     ; Check if clipboard is in use up to 20 times
             Sleep(50)                                                                               ;  Wait 50ms each time and check again
         Until !DllCall('GetOpenClipboardWindow')                                                    ; Break when clipboard isn't in use
+            Sleep(200)                                                                              ; Add extra sleep to allow time for Microsoft Word, PowerPoint and Excel to paste before the clipboard is restored.
         this.restore()                                                                              ; Restore original clipbaord contents
     }
     
